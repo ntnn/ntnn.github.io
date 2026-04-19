@@ -1,0 +1,1 @@
+https://github.com/gohugoio/hugo/releases/download/v{{.Version}}/hugo_{{.Version}}_{{.OS}}-{{.Arch}}.tar.gz,hugo,linux,amd64,Q+/5kmazaCBtLyv7lefVso84Xkh3CZ6mGasDz1T9faFjhCqhXHZKY5e++fYuS6eL7RgnwOHY2KzcMy23ZGejtA==,sha512
