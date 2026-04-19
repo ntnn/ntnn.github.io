@@ -1,1 +1,7 @@
 /hack/tools
+
+# hugo lockfile
+*.lock
+
+# hugo build artifacts
+/public
