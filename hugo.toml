@@ -1,4 +1,11 @@
 baseURL = 'https://ntnn.de/'
 locale = 'en-us'
-title = 'ntnn.de'
+title = 'ntnn'
 theme = 'ntnn'
+
+[menus]
+
+  [[menus.main]]
+    name = 'Start'
+    pageRef = '/'
+    weight = 10
