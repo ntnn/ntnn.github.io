@@ -1,0 +1,91 @@
+{{ define "head-extra" }}
+  {{- $opts := dict
+    "minify" (cond hugo.IsDevelopment false true)
+    "sourceMap" (cond hugo.IsDevelopment "linked" "none")
+  }}
+  {{- with resources.Get "css/prs.css" }}
+    {{- with . | css.Build $opts }}
+      {{- if hugo.IsDevelopment }}
+        <link rel="stylesheet" href="{{ .RelPermalink }}">
+      {{- else }}
+        {{- with . | fingerprint }}
+          <link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}" crossorigin="anonymous">
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- with resources.Get "js/prs.mjs" }}
+    {{- with . | js.Build (merge $opts (dict "targetPath" "js/prs.js")) }}
+      {{- if hugo.IsDevelopment }}
+        <script defer src="{{ .RelPermalink }}"></script>
+      {{- else }}
+        {{- with . | fingerprint }}
+          <script defer src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}" crossorigin="anonymous"></script>
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{ end }}
+
+{{ define "main" }}
+  <section class="prs" id="prs" aria-labelledby="prs-title">
+    <h1 id="prs-title">{{ .Title }}</h1>
+    {{ .Content }}
+
+    <form id="prs-form" class="prs-form" method="get" action="{{ .RelPermalink }}">
+      <label for="prs-repos">Repositories</label>
+      <input id="prs-repos" name="repos" type="text" spellcheck="false" autocapitalize="none"
+        placeholder="platform-mesh/*,kcp-dev/*,owner/repository" aria-describedby="prs-repos-help">
+      <p id="prs-repos-help" class="prs-help">
+        Comma-separated <code>organization/*</code> or <code>owner/repository</code> selectors.
+      </p>
+
+      <label for="prs-exclude">Exclude repositories</label>
+      <input id="prs-exclude" name="exclude" type="text" spellcheck="false" autocapitalize="none"
+        placeholder="platform-mesh/portal" aria-describedby="prs-exclude-help">
+      <p id="prs-exclude-help" class="prs-help">
+        Comma-separated <code>owner/repository</code> selectors. Exclusions always win.
+        Both URL parameters may repeat.
+      </p>
+
+      <div class="prs-actions">
+        <button id="prs-apply" type="submit" aria-describedby="prs-cooldown">Apply filters</button>
+        <button id="prs-refresh" type="button" aria-describedby="prs-cooldown" hidden>Refresh</button>
+        <a href="{{ .RelPermalink }}?repos=platform-mesh/*,kcp-dev/*,kubernetes-sigs/multicluster-runtime&amp;exclude=platform-mesh/portal">Open example</a>
+      </div>
+    </form>
+
+    <noscript><p>JavaScript is required to fetch pull requests from GitHub.</p></noscript>
+    <p id="prs-status" class="prs-status" role="status" aria-live="polite" aria-atomic="true">
+      Enter repositories or open the example.
+    </p>
+    <p id="prs-cooldown" role="status" hidden></p>
+    <ul id="prs-problems" aria-label="Query problems" hidden></ul>
+
+    <div id="prs-results" class="prs-results" role="region" aria-label="Pull request results" tabindex="0" hidden>
+      <table>
+        <caption>Newest updates first; local times. Counts reflect filters, not GitHub's unfiltered total.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Repository</th>
+            <th scope="col">Pull request</th>
+            <th scope="col">Author</th>
+            <th scope="col">Updated</th>
+          </tr>
+        </thead>
+        <tbody id="prs-rows"></tbody>
+      </table>
+    </div>
+
+    <details class="prs-notes">
+      <summary>Filters and GitHub limits</summary>
+      <p>
+        Titles marked <code>WIP</code>, <code>work in progress</code>, <code>draft</code>,
+        <code>DNM</code>, or <code>do not merge</code> are excluded.
+        Markers match case-insensitively in brackets or parentheses, or at the start of a title.
+      </p>
+      <p>Requests are unauthenticated, paced, and never polled automatically.</p>
+      <ul id="prs-limitations"></ul>
+    </details>
+  </section>
+{{ end }}

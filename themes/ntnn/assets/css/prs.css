@@ -1,0 +1,134 @@
+main {
+  min-width: 0;
+}
+
+.prs {
+  overflow-wrap: anywhere;
+}
+
+.prs-form {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
+
+.prs-form label {
+  font-weight: bold;
+}
+
+.prs-form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--fg-muted);
+  border-radius: 0.2rem;
+  background: var(--code-bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.prs-help {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.prs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.prs-actions button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--fg-muted);
+  border-radius: 0.2rem;
+  background: var(--code-bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.prs-actions button:hover:not(:disabled) {
+  border-color: var(--link);
+}
+
+.prs-actions button:disabled {
+  color: var(--fg-muted);
+  cursor: not-allowed;
+}
+
+.prs :focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.prs-status {
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--fg-muted);
+}
+
+.prs-status[data-state="ready"],
+.prs-status[data-state="empty"] {
+  border-color: var(--green);
+}
+
+.prs-status[data-state="partial"],
+.prs-status[data-state="rate-limited"] {
+  border-color: var(--orange);
+}
+
+.prs-status[data-state="invalid"],
+.prs-status[data-state="error"] {
+  border-color: var(--red);
+}
+
+.prs-results {
+  overflow-x: auto;
+}
+
+.prs-results table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.prs-results caption {
+  padding: 0 0 0.75rem;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.prs-results th,
+.prs-results td {
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prs-results th:nth-child(1) {
+  width: 25%;
+}
+
+.prs-results th:nth-child(2) {
+  width: 40%;
+}
+
+.prs-results th:nth-child(3) {
+  width: 15%;
+}
+
+.prs-results th:nth-child(4) {
+  width: 20%;
+}
+
+.prs-notes {
+  margin-top: 1.5rem;
+}
+
+.prs-notes summary {
+  cursor: pointer;
+}

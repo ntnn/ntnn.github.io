@@ -9,3 +9,8 @@ theme = 'ntnn'
     name = 'Start'
     pageRef = '/'
     weight = 10
+
+  [[menus.main]]
+    name = 'Open PRs'
+    pageRef = '/prs'
+    weight = 20
