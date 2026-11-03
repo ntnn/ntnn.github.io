@@ -303,7 +303,7 @@ export function createGitHubClient({
         }
 
         const url = new URL('/search/issues', API_ORIGIN);
-        url.search = new URLSearchParams({ q: searchQuery(scope, query), per_page: RESULTS_PER_PAGE, sort: 'updated', order: 'desc', page });
+        url.search = new URLSearchParams({ q: searchQuery(scope, query), per_page: RESULTS_PER_PAGE, sort: 'updated', order: 'asc', page });
         progress('loading', scope, page);
         nextRequestAt = now() + SEARCH_INTERVAL_MS;
         requests++;
@@ -346,7 +346,7 @@ export function createGitHubClient({
       pullRequests: [...snapshots.values()]
         .filter(snapshot => snapshot.pullRequest !== null)
         .map(snapshot => snapshot.pullRequest)
-        .sort((left, right) => right.updatedAt - left.updatedAt || left.id - right.id),
+        .sort((left, right) => left.updatedAt - right.updatedAt || left.id - right.id),
       complete: problems.length === 0,
       problems,
       pagesLoaded,

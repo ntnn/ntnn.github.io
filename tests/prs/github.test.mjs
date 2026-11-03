@@ -83,8 +83,8 @@ test('load: fetch selected scopes serially with mandatory qualifiers and no cred
   assert.deepEqual(result.problems, []);
   assert.equal(result.requests, 3);
   assert.equal(result.pagesLoaded, 3);
-  assert.deepEqual(result.pullRequests.map(pr => pr.id), [2, 3, 1]);
-  assert.deepEqual(result.pullRequests[1], {
+  assert.deepEqual(result.pullRequests.map(pr => pr.id), [1, 2, 3]);
+  assert.deepEqual(result.pullRequests[2], {
     id: 3,
     repository: 'kubernetes-sigs/multicluster-runtime',
     number: 3,
@@ -106,7 +106,7 @@ test('load: fetch selected scopes serially with mandatory qualifiers and no cred
     assert.equal(url.pathname, '/search/issues');
     assert.equal(url.searchParams.get('per_page'), String(RESULTS_PER_PAGE));
     assert.equal(url.searchParams.get('sort'), 'updated');
-    assert.equal(url.searchParams.get('order'), 'desc');
+    assert.equal(url.searchParams.get('order'), 'asc');
     assert.equal(url.searchParams.get('page'), '1');
     assert.equal(init.method, 'GET');
     assert.equal(init.credentials, 'omit');
@@ -119,6 +119,25 @@ test('load: fetch selected scopes serially with mandatory qualifiers and no cred
   assert.equal(progress.at(-1).count, 3);
   assert.equal(progress.at(-1).scopeCount, 3);
   assert.equal(progress.at(-1).completedScopes, 2);
+});
+
+test('load: sort oldest updates first across scopes and pages', async () => {
+  const older = pullRequest({ id: 2 });
+  const newer = pullRequest({ id: 1, updated_at: '2026-01-03T00:00:00Z' });
+  const oldest = pullRequest({ id: 3, repositoryName: 'other/repo', updated_at: '2025-12-01T00:00:00Z' });
+  const tied = pullRequest({ id: 4, repositoryName: 'other/repo' });
+  const { client, calls } = fixture([
+    fullPage([older]),
+    page([newer], { total: RESULTS_PER_PAGE + 1 }),
+    page([oldest, tied]),
+  ]);
+  const result = await client.load('repos=owner/*,other/repo');
+  assert.equal(result.complete, true);
+  assert.deepEqual(result.pullRequests.map(pr => pr.id), [3, 2, 4, 1]);
+  for (const { url } of calls) {
+    assert.equal(url.searchParams.get('sort'), 'updated');
+    assert.equal(url.searchParams.get('order'), 'asc');
+  }
 });
 
 for (const search of ['', 'exclude=owner/repo', 'repos=owner/repo&exclude=owner/repo']) {
