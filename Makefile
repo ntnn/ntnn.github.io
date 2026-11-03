@@ -1,4 +1,5 @@
 GO ?= go
+NODE ?= node
 TOOLS_DIR := hack/tools
 
 HUGO_VER := 0.160.1
@@ -11,6 +12,10 @@ server: $(HUGO)
 .PHONY: build
 build: $(HUGO)
 	HUGO_ENVIRONMENT=production $(HUGO) build --minify
+
+.PHONY: test
+test:
+	$(NODE) --test tests/prs/*.test.mjs
 
 $(HUGO):
 	mkdir -p $(TOOLS_DIR)
