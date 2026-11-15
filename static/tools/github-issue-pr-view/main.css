@@ -1,0 +1,265 @@
+:root {
+  color-scheme: dark;
+  --bg: #323232;
+  --fg: #cccccc;
+  --fg-muted: #8a8a8a;
+  --link: #00aaff;
+  --link-hover: #33bbff;
+  --orange: #ffaf00;
+  --green: #5faf00;
+  --red: #cc0000;
+  --border-color: #444444;
+  --code-bg: #2a2a2a;
+  --selection-bg: #444444;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #e8e8e8;
+    --fg: #323232;
+    --fg-muted: #5a5a5a;
+    --link: #0077cc;
+    --link-hover: #005599;
+    --orange: #cc8800;
+    --green: #3d7a00;
+    --red: #aa0000;
+    --border-color: #b0b0b0;
+    --code-bg: #d8d8d8;
+    --selection-bg: #c0c0c0;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 1rem;
+  color: var(--fg);
+  background-color: var(--bg);
+  font-family: sans-serif;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
+::selection {
+  background: var(--selection-bg);
+}
+
+code {
+  padding: 0.1em 0.3em;
+  background-color: var(--code-bg);
+}
+
+h1 {
+  color: var(--orange);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  background: var(--code-bg);
+}
+
+.field {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.field-narrow {
+  flex: 0 0 auto;
+}
+
+.field label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.field input,
+.field select,
+.actions button {
+  box-sizing: border-box;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--fg-muted);
+  border-radius: 0.2rem;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.field input {
+  width: 100%;
+  font-family: monospace;
+}
+
+.help {
+  margin: 0.25rem 0 0;
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.actions button {
+  cursor: pointer;
+}
+
+.actions button:hover:not(:disabled) {
+  border-color: var(--link);
+}
+
+.actions button:disabled {
+  color: var(--fg-muted);
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.status {
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--fg-muted);
+}
+
+.status[data-state="ready"],
+.status[data-state="empty"] {
+  border-color: var(--green);
+}
+
+.status[data-state="partial"],
+.status[data-state="rate-limited"] {
+  border-color: var(--orange);
+}
+
+.status[data-state="invalid"],
+.status[data-state="error"] {
+  border-color: var(--red);
+}
+
+/* Own scroll pane keeps the header row visible. */
+.results {
+  max-height: 75vh;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+}
+
+.results table {
+  width: 100%;
+  min-width: 60rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.results caption {
+  padding: 0.4rem 0.5rem;
+  color: var(--fg-muted);
+  font-family: sans-serif;
+  text-align: left;
+}
+
+.results th,
+.results td {
+  overflow: hidden;
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.results td {
+  padding: 0.2rem 0.5rem;
+}
+
+.results th {
+  position: sticky;
+  top: 0;
+  padding: 0;
+  background: var(--code-bg);
+}
+
+.results th button {
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: bold;
+  text-align: left;
+  cursor: pointer;
+}
+
+.results th[aria-sort="ascending"] button::after {
+  content: " \25B2";
+}
+
+.results th[aria-sort="descending"] button::after {
+  content: " \25BC";
+}
+
+.results tbody tr:nth-child(even) {
+  background: var(--code-bg);
+}
+
+.results tbody tr:hover {
+  background: var(--selection-bg);
+}
+
+.results th:nth-child(1) {
+  width: 5%;
+}
+
+.results th:nth-child(2) {
+  width: 24%;
+}
+
+.results th:nth-child(3) {
+  width: 6%;
+}
+
+.results th:nth-child(4) {
+  width: 33%;
+}
+
+.results th:nth-child(5) {
+  width: 10%;
+}
+
+.results th:nth-child(6) {
+  width: 22%;
+}
+
+.results td:nth-child(3) {
+  text-align: right;
+}
+
+.notes {
+  margin-top: 1.5rem;
+}
+
+.notes summary {
+  cursor: pointer;
+}

@@ -16,10 +16,10 @@ export const SEARCH_INTERVAL_MS = 6000;
 // A stalled request must not block remaining scopes indefinitely.
 export const REQUEST_TIMEOUT_MS = 30_000;
 
-// Large PR bodies must not exhaust browser memory.
+// Large issue and PR bodies must not exhaust browser memory.
 export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
-// Bound retained metadata independently of discarded PR bodies.
+// Bound retained metadata independently of discarded bodies.
 export const MAX_TITLE_LENGTH = 1024;
 export const MAX_AUTHOR_LENGTH = 128;
 
@@ -32,9 +32,16 @@ const SECOND_MS = 1000;
 const API_ORIGIN = 'https://api.github.com';
 const WEB_ORIGIN = 'https://github.com';
 
+// Narrow searches server-side; draft:false would drop issues from mixed searches.
+const TYPE_QUALIFIERS = Object.freeze({
+  all: 'is:open archived:false',
+  issue: 'is:issue is:open archived:false',
+  pr: 'is:pr is:open archived:false draft:false',
+});
+
 export const SEARCH_LIMITATIONS = Object.freeze([
   'GitHub search scans at most 4,000 repositories per query.',
-  'GitHub search indexing can lag repository and pull request changes.',
+  'GitHub search indexing can lag repository, issue, and pull request changes.',
 ]);
 
 class GitHubError extends Error {
@@ -66,17 +73,20 @@ function readItem(item, query) {
     throw new GitHubError('invalid-response', 'GitHub returned an invalid search entry.');
   }
 
-  const snapshot = { id: item.id, updatedAt: readTimestamp(item.updated_at), pullRequest: null };
-  if (item.pull_request === undefined || item.pull_request === null) return snapshot;
+  const snapshot = { id: item.id, updatedAt: readTimestamp(item.updated_at), entry: null };
+  const isPullRequest = item.pull_request !== undefined && item.pull_request !== null;
+  const type = isPullRequest ? 'pr' : 'issue';
+  const label = isPullRequest ? 'pull request' : 'issue';
 
-  if (!isRecord(item.pull_request) || !isPositiveInteger(item.number) ||
-      typeof item.title !== 'string' || item.title.length > MAX_TITLE_LENGTH || typeof item.draft !== 'boolean' ||
+  if (!isPositiveInteger(item.number) ||
+      typeof item.title !== 'string' || item.title.length > MAX_TITLE_LENGTH ||
       !['open', 'closed'].includes(item.state) ||
       !(item.user === null || (isRecord(item.user) && typeof item.user.login === 'string' &&
         item.user.login.length <= MAX_AUTHOR_LENGTH && item.user.login.trim())) ||
       (item.repository !== undefined && (!isRecord(item.repository) || typeof item.repository.archived !== 'boolean')) ||
-      (item.pull_request.merged_at != null && !Number.isFinite(readTimestamp(item.pull_request.merged_at)))) {
-    throw new GitHubError('invalid-response', 'GitHub returned an invalid pull request.');
+      (isPullRequest && (!isRecord(item.pull_request) || typeof item.draft !== 'boolean' ||
+        (item.pull_request.merged_at != null && !Number.isFinite(readTimestamp(item.pull_request.merged_at)))))) {
+    throw new GitHubError('invalid-response', `GitHub returned an invalid ${label}.`);
   }
 
   const repositoryMatch = typeof item.repository_url === 'string' &&
@@ -88,18 +98,20 @@ function readItem(item, query) {
     throw new GitHubError('invalid-response', 'GitHub returned an invalid repository URL.', { cause });
   }
 
-  const url = `${WEB_ORIGIN}/${repository}/pull/${item.number}`;
+  const url = `${WEB_ORIGIN}/${repository}/${isPullRequest ? 'pull' : 'issues'}/${item.number}`;
   if (typeof item.html_url !== 'string' || item.html_url.toLowerCase() !== url) {
-    throw new GitHubError('invalid-response', 'GitHub returned an invalid pull request URL.');
+    throw new GitHubError('invalid-response', `GitHub returned an invalid ${label} URL.`);
   }
 
-  if (item.state !== 'open' || item.draft || item.repository?.archived || item.pull_request.merged_at != null ||
-      !matchesRepository(repository, query) || !isReadyTitle(item.title)) {
+  if (item.state !== 'open' || item.repository?.archived || !matchesRepository(repository, query) ||
+      (query.type !== 'all' && query.type !== type) ||
+      (isPullRequest && (item.draft || item.pull_request.merged_at != null || !isReadyTitle(item.title)))) {
     return snapshot;
   }
 
-  snapshot.pullRequest = {
+  snapshot.entry = {
     id: item.id,
+    type,
     repository,
     number: item.number,
     title: item.title,
@@ -123,7 +135,7 @@ function readPage(data, query) {
 }
 
 function searchQuery(scope, query) {
-  let search = `is:pr is:open archived:false draft:false ${scope}`;
+  let search = `${TYPE_QUALIFIERS[query.type]} ${scope}`;
   if (scope.startsWith('org:')) {
     const owner = scope.slice('org:'.length);
     for (const repository of query.exclude) {
@@ -324,8 +336,8 @@ export function createGitHubClient({
         for (const snapshot of result.items) {
           const previous = snapshots.get(snapshot.id);
           if (previous && previous.updatedAt > snapshot.updatedAt) continue;
-          if (previous?.pullRequest) count--;
-          if (snapshot.pullRequest) count++;
+          if (previous?.entry) count--;
+          if (snapshot.entry) count++;
           snapshots.set(snapshot.id, snapshot);
         }
         const expectedItems = Math.min(RESULTS_PER_PAGE, Math.max(0, result.total - (page - 1) * RESULTS_PER_PAGE));
@@ -343,9 +355,9 @@ export function createGitHubClient({
 
     signal.throwIfAborted();
     return {
-      pullRequests: [...snapshots.values()]
-        .filter(snapshot => snapshot.pullRequest !== null)
-        .map(snapshot => snapshot.pullRequest)
+      entries: [...snapshots.values()]
+        .filter(snapshot => snapshot.entry !== null)
+        .map(snapshot => snapshot.entry)
         .sort((left, right) => left.updatedAt - right.updatedAt || left.id - right.id),
       complete: problems.length === 0,
       problems,

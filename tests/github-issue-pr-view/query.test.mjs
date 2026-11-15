@@ -4,13 +4,14 @@ import test from 'node:test';
 import {
   MAX_QUERY_LENGTH,
   MAX_SELECTORS,
+  TYPES,
   buildSearchScopes,
   isReadyTitle,
   matchesRepository,
   normalizeSelector,
   parseQuery,
   serializeQuery,
-} from '../../static/tools/prs/query.mjs';
+} from '../../static/tools/github-issue-pr-view/query.mjs';
 
 const EXAMPLE_QUERY = '?repos=platform-mesh/*,kcp-dev/*,kubernetes-sigs/multicluster-runtime&exclude=platform-mesh/portal';
 
@@ -21,6 +22,7 @@ for (const { name, search, expected } of [
     expected: {
       repos: ['platform-mesh/*', 'kcp-dev/*', 'kubernetes-sigs/multicluster-runtime'],
       exclude: ['platform-mesh/portal'],
+      type: 'all',
     },
   },
   {
@@ -29,42 +31,43 @@ for (const { name, search, expected } of [
     expected: {
       repos: ['platform-mesh/*', 'kcp-dev/*', 'kubernetes-sigs/multicluster-runtime'],
       exclude: ['platform-mesh/portal', 'kcp-dev/kcp', 'platform-mesh/dashboard'],
+      type: 'all',
     },
   },
   {
     name: 'whitespace, casing, and duplicates',
     search: '?repos=+PLATFORM-MESH/*+,kcp-dev/*&repos=platform-mesh/*&exclude=+Platform-Mesh/Portal+,platform-mesh/portal',
-    expected: { repos: ['platform-mesh/*', 'kcp-dev/*'], exclude: ['platform-mesh/portal'] },
+    expected: { repos: ['platform-mesh/*', 'kcp-dev/*'], exclude: ['platform-mesh/portal'], type: 'all' },
   },
   {
     name: 'wildcards cover exact includes regardless of order',
     search: '?repos=platform-mesh/portal,kcp-dev/*,platform-mesh/*,kcp-dev/kcp,other/repo',
-    expected: { repos: ['kcp-dev/*', 'platform-mesh/*', 'other/repo'], exclude: [] },
+    expected: { repos: ['kcp-dev/*', 'platform-mesh/*', 'other/repo'], exclude: [], type: 'all' },
   },
   {
     name: 'explicit include/exclude conflict remains serializable',
     search: '?repos=platform-mesh/portal&exclude=platform-mesh/portal',
-    expected: { repos: ['platform-mesh/portal'], exclude: ['platform-mesh/portal'] },
+    expected: { repos: ['platform-mesh/portal'], exclude: ['platform-mesh/portal'], type: 'all' },
   },
   {
     name: 'URL-encoded separators',
     search: '?repos=platform-mesh%2F*%2Ckcp-dev%2F*&exclude=platform-mesh%2Fportal',
-    expected: { repos: ['platform-mesh/*', 'kcp-dev/*'], exclude: ['platform-mesh/portal'] },
+    expected: { repos: ['platform-mesh/*', 'kcp-dev/*'], exclude: ['platform-mesh/portal'], type: 'all' },
   },
   {
     name: 'exact repository duplicates',
     search: '?repos=owner/repo,OWNER/REPO&repos=owner/repo',
-    expected: { repos: ['owner/repo'], exclude: [] },
+    expected: { repos: ['owner/repo'], exclude: [], type: 'all' },
   },
   {
     name: 'unrelated parameters do not become selectors',
     search: '?theme=light&org=other&repos=owner/repo',
-    expected: { repos: ['owner/repo'], exclude: [] },
+    expected: { repos: ['owner/repo'], exclude: [], type: 'all' },
   },
   {
     name: 'exclusions do not imply includes',
     search: '?exclude=platform-mesh/portal',
-    expected: { repos: [], exclude: ['platform-mesh/portal'] },
+    expected: { repos: [], exclude: ['platform-mesh/portal'], type: 'all' },
   },
 ]) {
   test(`parseQuery: ${name}`, () => {
@@ -75,14 +78,14 @@ for (const { name, search, expected } of [
 for (const search of ['', '?', '?repos', '?repos=&exclude=', '?repos=+%20&repos=&exclude=+', '?theme=light']) {
   test(`parseQuery: empty selectors in ${JSON.stringify(search)}`, () => {
     const query = parseQuery(search);
-    assert.deepEqual(query, { repos: [], exclude: [] });
+    assert.deepEqual(query, { repos: [], exclude: [], type: 'all' });
     assert.deepEqual(buildSearchScopes(query), []);
     assert.equal(matchesRepository('owner/repo', query), false);
   });
 }
 
 test('parseQuery: omitted query is empty', () => {
-  assert.deepEqual(parseQuery(), { repos: [], exclude: [] });
+  assert.deepEqual(parseQuery(), { repos: [], exclude: [], type: 'all' });
 });
 
 for (const search of [
@@ -106,6 +109,30 @@ for (const search of [
   });
 }
 
+for (const { search, expected } of [
+  { search: '?type=issue', expected: 'issue' },
+  { search: '?type=pr', expected: 'pr' },
+  { search: '?type=all', expected: 'all' },
+  { search: '?type=+PR+', expected: 'pr' },
+  { search: '?type=', expected: 'all' },
+  { search: '?type=&type=issue', expected: 'issue' },
+]) {
+  test(`parseQuery: type in ${JSON.stringify(search)}`, () => {
+    assert.equal(parseQuery(search).type, expected);
+    assert.ok(TYPES.includes(expected));
+  });
+}
+
+for (const search of ['?type=issues', '?type=pull', '?type=issue,pr', '?type=is:closed']) {
+  test(`parseQuery: reject type in ${JSON.stringify(search)}`, () => {
+    assert.throws(() => parseQuery(search), /Invalid type/);
+  });
+}
+
+test('parseQuery: reject repeated types', () => {
+  assert.throws(() => parseQuery('?type=issue&type=pr'), /single type/);
+});
+
 for (const value of [null, 1, {}, [], new URLSearchParams('repos=owner/repo')]) {
   test(`parseQuery: reject non-string ${JSON.stringify(value)}`, () => {
     assert.throws(() => parseQuery(value), TypeError);
@@ -115,7 +142,7 @@ for (const value of [null, 1, {}, [], new URLSearchParams('repos=owner/repo')]) 
 test('parseQuery: accept query-length boundary and reject overflow', () => {
   const prefix = '?repos=owner/repo&ignored=';
   const search = prefix + 'x'.repeat(MAX_QUERY_LENGTH - prefix.length);
-  assert.deepEqual(parseQuery(search), { repos: ['owner/repo'], exclude: [] });
+  assert.deepEqual(parseQuery(search), { repos: ['owner/repo'], exclude: [], type: 'all' });
   assert.throws(() => parseQuery(`${search}x`), RangeError);
 });
 
@@ -129,14 +156,14 @@ test('parseQuery: selector limit counts includes and excludes together', () => {
 test('parseQuery: duplicate selectors cannot bypass selector limit', () => {
   const selectors = Array(MAX_SELECTORS).fill('owner/repo');
   const search = `?repos=${selectors.join(',')}`;
-  assert.deepEqual(parseQuery(search), { repos: ['owner/repo'], exclude: [] });
+  assert.deepEqual(parseQuery(search), { repos: ['owner/repo'], exclude: [], type: 'all' });
   assert.throws(() => parseQuery(`${search}&repos=OWNER/REPO`), RangeError);
 });
 
 test('parseQuery: repeated parameters cannot bypass selector limit', () => {
   const params = new URLSearchParams();
   for (let index = 0; index < MAX_SELECTORS; index++) params.append('exclude', 'owner/repo');
-  assert.deepEqual(parseQuery(params.toString()), { repos: [], exclude: ['owner/repo'] });
+  assert.deepEqual(parseQuery(params.toString()), { repos: [], exclude: ['owner/repo'], type: 'all' });
   params.append('exclude', 'owner/repo');
   assert.throws(() => parseQuery(params.toString()), RangeError);
 });
@@ -273,9 +300,18 @@ test('serializeQuery: round-trip normalized selectors with URLSearchParams', () 
 });
 
 test('serializeQuery: omit empty parameters', () => {
+  assert.equal(new URLSearchParams(serializeQuery(parseQuery('repos=owner/repo&type=all'))).has('type'), false);
   assert.equal(serializeQuery(parseQuery('')), '');
   assert.equal(new URLSearchParams(serializeQuery(parseQuery('repos=owner/repo'))).has('exclude'), false);
   assert.equal(new URLSearchParams(serializeQuery(parseQuery('exclude=owner/repo'))).has('repos'), false);
+});
+
+test('serializeQuery: round-trip type', () => {
+  for (const type of ['issue', 'pr']) {
+    const query = parseQuery(`repos=owner/repo&type=${type}`);
+    assert.equal(new URLSearchParams(serializeQuery(query)).get('type'), type);
+    assert.deepEqual(parseQuery(serializeQuery(query)), query);
+  }
 });
 
 test('query consumers do not mutate parsed selectors', () => {

@@ -15,7 +15,7 @@ build: $(HUGO)
 
 .PHONY: test
 test:
-	$(NODE) --test tests/prs/*.test.mjs
+	$(NODE) --test tests/github-issue-pr-view/*.test.mjs
 
 $(HUGO):
 	mkdir -p $(TOOLS_DIR)

@@ -4,6 +4,9 @@ export const MAX_QUERY_LENGTH = 8192;
 // Bound search scopes before duplicate removal can hide oversized input.
 export const MAX_SELECTORS = 50;
 
+// Entry kinds accepted by the type parameter; all selects issues and pull requests.
+export const TYPES = Object.freeze(['all', 'issue', 'pr']);
+
 // GitHub limits account and repository name lengths.
 const MAX_OWNER_LENGTH = 39;
 const MAX_REPOSITORY_LENGTH = 100;
@@ -41,7 +44,7 @@ export function parseQuery(search = '') {
   }
 
   const params = new URLSearchParams(search);
-  const query = { repos: [], exclude: [] };
+  const query = { repos: [], exclude: [], type: 'all' };
   let selectorCount = 0;
 
   for (const key of ['repos', 'exclude']) {
@@ -68,6 +71,17 @@ export function parseQuery(search = '') {
     return repository === '*' || !organizations.has(`${owner}/*`);
   });
 
+  const types = params.getAll('type').map(value => value.trim().toLowerCase()).filter(Boolean);
+  if (types.length > 1) {
+    throw new Error('Query accepts a single type.');
+  }
+  if (types.length === 1) {
+    if (!TYPES.includes(types[0])) {
+      throw new Error(`Invalid type ${JSON.stringify(types[0])}; expected ${TYPES.join(', ')}.`);
+    }
+    query.type = types[0];
+  }
+
   return query;
 }
 
@@ -76,6 +90,7 @@ export function serializeQuery(query) {
   for (const key of ['repos', 'exclude']) {
     if (query[key].length) params.set(key, query[key].join(','));
   }
+  if (query.type !== 'all') params.set('type', query.type);
   return params.toString();
 }
 

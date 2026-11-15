@@ -1,23 +1,29 @@
 import { createGitHubClient, SEARCH_LIMITATIONS } from './github.mjs';
-import { MAX_QUERY_LENGTH, parseQuery } from './query.mjs';
+import { MAX_QUERY_LENGTH, TYPES, parseQuery } from './query.mjs';
 
 // Browsers clamp larger timer delays to a near-immediate callback.
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
-function initPRPage(root) {
-  const form = root.querySelector('#prs-form');
-  const reposInput = root.querySelector('#prs-repos');
-  const excludeInput = root.querySelector('#prs-exclude');
-  const applyButton = root.querySelector('#prs-apply');
-  const refreshButton = root.querySelector('#prs-refresh');
-  const status = root.querySelector('#prs-status');
-  const cooldown = root.querySelector('#prs-cooldown');
-  const problems = root.querySelector('#prs-problems');
-  const results = root.querySelector('#prs-results');
-  const rows = root.querySelector('#prs-rows');
-  const limitations = root.querySelector('#prs-limitations');
+const TYPE_LABELS = Object.freeze({ issue: 'Issue', pr: 'PR' });
+
+function initView(root) {
+  const form = root.querySelector('#filters');
+  const reposInput = root.querySelector('#filter-repos');
+  const excludeInput = root.querySelector('#filter-exclude');
+  const typeInput = root.querySelector('#filter-type');
+  const applyButton = root.querySelector('#apply');
+  const refreshButton = root.querySelector('#refresh');
+  const status = root.querySelector('#status');
+  const cooldown = root.querySelector('#cooldown');
+  const problems = root.querySelector('#problems');
+  const results = root.querySelector('#results');
+  const rows = root.querySelector('#rows');
+  const sortButtons = root.querySelectorAll('button[data-sort]');
+  const limitations = root.querySelector('#limitations');
   const client = createGitHubClient();
   const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'long' });
+  const sort = { key: 'updatedAt', descending: false };
+  let entries = [];
   let activeController;
   let loading = false;
   let hasQuery = false;
@@ -30,6 +36,8 @@ function initPRPage(root) {
     const params = new URLSearchParams(window.location.search);
     reposInput.value = params.getAll('repos').filter(value => value.trim()).join(',');
     excludeInput.value = params.getAll('exclude').filter(value => value.trim()).join(',');
+    const type = params.get('type')?.trim().toLowerCase();
+    if (TYPES.includes(type)) typeInput.value = type;
   }
   for (const limitation of SEARCH_LIMITATIONS) {
     const item = document.createElement('li');
@@ -66,6 +74,7 @@ function initPRPage(root) {
   }
 
   function clearResults() {
+    entries = [];
     rows.replaceChildren();
     results.hidden = true;
     problems.replaceChildren();
@@ -84,7 +93,7 @@ function initPRPage(root) {
   }
 
   function countLabel(count) {
-    return `${count.toLocaleString()} ${count === 1 ? 'pull request' : 'pull requests'}`;
+    return `${count.toLocaleString()} ${count === 1 ? 'row' : 'rows'}`;
   }
 
   function renderProgress(update) {
@@ -104,18 +113,47 @@ function initPRPage(root) {
     return element;
   }
 
-  function renderResult(result) {
+  function compareEntries(left, right) {
+    const a = left[sort.key] ?? '';
+    const b = right[sort.key] ?? '';
+    const order = typeof a === 'number' ? a - b : a.localeCompare(b);
+    return (sort.descending ? -order : order) || left.updatedAt - right.updatedAt || left.id - right.id;
+  }
+
+  function renderRows() {
     const fragment = document.createDocumentFragment();
-    for (const pr of result.pullRequests) {
+    for (const entry of [...entries].sort(compareEntries)) {
       const link = document.createElement('a');
-      link.href = pr.url;
-      link.textContent = `#${pr.number} ${pr.title}`;
+      link.href = entry.url;
+      link.title = entry.title;
+      link.textContent = entry.title;
       const row = document.createElement('tr');
-      row.append(cell(pr.repository), cell(link), cell(pr.author ?? 'Deleted user'), cell(timeElement(pr.updatedAt)));
+      row.append(
+        cell(TYPE_LABELS[entry.type]),
+        cell(entry.repository),
+        cell(String(entry.number)),
+        cell(link),
+        cell(entry.author ?? 'Deleted user'),
+        cell(timeElement(entry.updatedAt)),
+      );
       fragment.append(row);
     }
     rows.replaceChildren(fragment);
-    results.hidden = result.pullRequests.length === 0;
+
+    for (const button of sortButtons) {
+      const header = button.closest('th');
+      if (button.dataset.sort === sort.key) {
+        header.setAttribute('aria-sort', sort.descending ? 'descending' : 'ascending');
+      } else {
+        header.removeAttribute('aria-sort');
+      }
+    }
+  }
+
+  function renderResult(result) {
+    entries = result.entries;
+    renderRows();
+    results.hidden = entries.length === 0;
 
     for (const problem of result.problems) {
       const item = document.createElement('li');
@@ -124,12 +162,12 @@ function initPRPage(root) {
     }
     problems.hidden = result.problems.length === 0;
 
-    const count = countLabel(result.pullRequests.length);
+    const count = countLabel(entries.length);
     const limited = result.problems.some(problem => problem.code === 'rate-limit');
     if (result.complete) {
-      setStatus(result.pullRequests.length ? 'ready' : 'empty', result.pullRequests.length
+      setStatus(entries.length ? 'ready' : 'empty', entries.length
         ? `Showing ${count} after filtering.`
-        : 'No open pull requests match these filters.');
+        : 'No open issues or pull requests match these filters.');
     } else if (limited) {
       setStatus('rate-limited', result.pagesLoaded
         ? `GitHub rate limit reached. Showing ${count} from partial results.`
@@ -137,7 +175,7 @@ function initPRPage(root) {
     } else if (result.pagesLoaded) {
       setStatus('partial', `Partial results: ${count} after filtering. Some results could not be retrieved.`);
     } else {
-      setStatus('error', 'Could not load pull requests. See query problems below.');
+      setStatus('error', 'Could not load issues or pull requests. See query problems below.');
     }
     refreshButton.textContent = result.complete ? 'Refresh' : 'Retry';
     retryAt = result.retryAt;
@@ -167,7 +205,7 @@ function initPRPage(root) {
 
     loading = true;
     results.setAttribute('aria-busy', 'true');
-    setStatus('loading', 'Loading pull requests from GitHub.');
+    setStatus('loading', 'Loading issues and pull requests from GitHub.');
     updateControls();
     try {
       const result = await client.load(window.location.search, {
@@ -178,7 +216,7 @@ function initPRPage(root) {
       renderResult(result);
     } catch (error) {
       if (activeController !== controller || controller.signal.aborted) return;
-      setStatus('error', `Could not load pull requests: ${error instanceof Error ? error.message : 'Unexpected error.'}`);
+      setStatus('error', `Could not load issues or pull requests: ${error instanceof Error ? error.message : 'Unexpected error.'}`);
       refreshButton.textContent = 'Retry';
     } finally {
       if (activeController === controller) {
@@ -202,6 +240,13 @@ function initPRPage(root) {
       showInvalidQuery(error);
     }
   });
+  for (const button of sortButtons) {
+    button.addEventListener('click', () => {
+      sort.descending = sort.key === button.dataset.sort && !sort.descending;
+      sort.key = button.dataset.sort;
+      renderRows();
+    });
+  }
   refreshButton.addEventListener('click', () => {
     if (!loading && (retryAt === null || retryAt <= Date.now())) void load();
   });
@@ -218,5 +263,5 @@ function initPRPage(root) {
   void load();
 }
 
-const root = document.getElementById('prs');
-if (root) initPRPage(root);
+const root = document.getElementById('view');
+if (root) initView(root);

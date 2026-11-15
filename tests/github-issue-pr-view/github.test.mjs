@@ -11,7 +11,7 @@ import {
   SEARCH_INTERVAL_MS,
   SEARCH_LIMITATIONS,
   createGitHubClient,
-} from '../../static/tools/prs/github.mjs';
+} from '../../static/tools/github-issue-pr-view/github.mjs';
 
 const START = Date.parse('2026-01-01T00:00:00Z');
 const MINUTE_MS = 60_000;
@@ -31,6 +31,19 @@ function pullRequest({ id = 1, number = id, repositoryName = 'owner/repo', ...ov
     pull_request: { merged_at: null },
     ...overrides,
   };
+}
+
+function issue({ id = 1, number = id, repositoryName = 'owner/repo', ...overrides } = {}) {
+  return pullRequest({
+    id,
+    number,
+    repositoryName,
+    title: 'Report bug',
+    draft: undefined,
+    pull_request: undefined,
+    html_url: `https://github.com/${repositoryName}/issues/${number}`,
+    ...overrides,
+  });
 }
 
 function page(items = [], { total = items.length, incomplete = false, headers = {} } = {}) {
@@ -83,9 +96,10 @@ test('load: fetch selected scopes serially with mandatory qualifiers and no cred
   assert.deepEqual(result.problems, []);
   assert.equal(result.requests, 3);
   assert.equal(result.pagesLoaded, 3);
-  assert.deepEqual(result.pullRequests.map(pr => pr.id), [1, 2, 3]);
-  assert.deepEqual(result.pullRequests[2], {
+  assert.deepEqual(result.entries.map(entry => entry.id), [1, 2, 3]);
+  assert.deepEqual(result.entries[2], {
     id: 3,
+    type: 'pr',
     repository: 'kubernetes-sigs/multicluster-runtime',
     number: 3,
     title: 'Add feature',
@@ -97,9 +111,9 @@ test('load: fetch selected scopes serially with mandatory qualifiers and no cred
   assert.equal(result.retryAt, null);
   assert.deepEqual(waits, [SEARCH_INTERVAL_MS, SEARCH_INTERVAL_MS]);
   assert.deepEqual(calls.map(call => call.url.searchParams.get('q')), [
-    'is:pr is:open archived:false draft:false org:platform-mesh -repo:platform-mesh/portal',
-    'is:pr is:open archived:false draft:false org:kcp-dev',
-    'is:pr is:open archived:false draft:false repo:kubernetes-sigs/multicluster-runtime',
+    'is:open archived:false org:platform-mesh -repo:platform-mesh/portal',
+    'is:open archived:false org:kcp-dev',
+    'is:open archived:false repo:kubernetes-sigs/multicluster-runtime',
   ]);
   for (const { url, init } of calls) {
     assert.equal(url.origin, 'https://api.github.com');
@@ -133,7 +147,7 @@ test('load: sort oldest updates first across scopes and pages', async () => {
   ]);
   const result = await client.load('repos=owner/*,other/repo');
   assert.equal(result.complete, true);
-  assert.deepEqual(result.pullRequests.map(pr => pr.id), [3, 2, 4, 1]);
+  assert.deepEqual(result.entries.map(entry => entry.id), [3, 2, 4, 1]);
   for (const { url } of calls) {
     assert.equal(url.searchParams.get('sort'), 'updated');
     assert.equal(url.searchParams.get('order'), 'asc');
@@ -145,7 +159,7 @@ for (const search of ['', 'exclude=owner/repo', 'repos=owner/repo&exclude=owner/
     const { client, calls } = fixture([]);
     const result = await client.load(search);
     assert.equal(result.complete, true);
-    assert.deepEqual(result.pullRequests, []);
+    assert.deepEqual(result.entries, []);
     assert.equal(calls.length, 0);
   });
 }
@@ -161,7 +175,7 @@ test('load: remove duplicate and excluded explicit scopes', async () => {
   const result = await client.load('repos=OWNER/*,owner/repo,owner/*,other/repo&exclude=other/repo');
   assert.equal(result.complete, true);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url.searchParams.get('q'), 'is:pr is:open archived:false draft:false org:owner');
+  assert.equal(calls[0].url.searchParams.get('q'), 'is:open archived:false org:owner');
 });
 
 test('load: apply exclusions locally even when they do not fit GitHub query', async () => {
@@ -172,7 +186,7 @@ test('load: apply exclusions locally even when they do not fit GitHub query', as
   const search = calls[0].url.searchParams.get('q');
   assert.ok(search.includes(`-repo:${exclusions[0]}`));
   assert.ok(!search.includes(`-repo:${exclusions.at(-1)}`));
-  assert.deepEqual(result.pullRequests.map(pr => pr.id), [11]);
+  assert.deepEqual(result.entries.map(entry => entry.id), [11]);
 });
 
 test('load: paginate after a fully filtered page and ignore foreign pagination links', async () => {
@@ -186,16 +200,16 @@ test('load: paginate after a fully filtered page and ignore foreign pagination l
     ], { total: RESULTS_PER_PAGE + 3 }),
   ]);
   const result = await client.load('repos=owner/*&exclude=owner/ignored,owner/also-ignored');
-  assert.deepEqual(result.pullRequests.map(pr => pr.id), [103]);
+  assert.deepEqual(result.entries.map(entry => entry.id), [103]);
   assert.equal(result.complete, true);
   assert.deepEqual(calls.map(call => call.url.searchParams.get('page')), ['1', '2']);
   assert.ok(calls.every(call => call.url.origin === 'https://api.github.com'));
 });
 
-test('load: filter issues, closed PRs, drafts, WIP, archived repositories, and unrelated scopes', async () => {
+test('load: filter closed entries, draft and WIP PRs, archived repositories, and unrelated scopes', async () => {
   const { client } = fixture([page([
     pullRequest({ id: 1 }),
-    pullRequest({ id: 2, pull_request: undefined, draft: undefined }),
+    issue({ id: 2, state: 'closed' }),
     pullRequest({ id: 3, state: 'closed' }),
     pullRequest({ id: 4, draft: true }),
     pullRequest({ id: 5, title: '[DNM] Add feature' }),
@@ -203,20 +217,91 @@ test('load: filter issues, closed PRs, drafts, WIP, archived repositories, and u
     pullRequest({ id: 7, repositoryName: 'unselected/repo' }),
     pullRequest({ id: 8, pull_request: { merged_at: '2026-01-01T00:00:00Z' } }),
     pullRequest({ id: 9, repository: { archived: false } }),
+    issue({ id: 10, repository: { archived: true } }),
+    issue({ id: 11, repositoryName: 'unselected/repo' }),
   ])]);
   const result = await client.load('repos=owner/*');
   assert.equal(result.complete, true);
-  assert.deepEqual(result.pullRequests.map(pr => pr.id), [1, 9]);
+  assert.deepEqual(result.entries.map(entry => entry.id), [1, 9]);
+});
+
+test('load: return issues and pull requests with their type', async () => {
+  const { client, calls } = fixture([page([
+    pullRequest({ id: 1 }),
+    issue({ id: 2, user: null }),
+    issue({ id: 3, pull_request: null, title: '[WIP] Draft: track rollout' }),
+  ])]);
+  const result = await client.load('repos=owner/repo');
+  assert.equal(result.complete, true);
+  assert.equal(calls[0].url.searchParams.get('q'), 'is:open archived:false repo:owner/repo');
+  assert.deepEqual(result.entries.map(entry => [entry.id, entry.type]), [[1, 'pr'], [2, 'issue'], [3, 'issue']]);
+  assert.deepEqual(result.entries[1], {
+    id: 2,
+    type: 'issue',
+    repository: 'owner/repo',
+    number: 2,
+    title: 'Report bug',
+    author: null,
+    url: 'https://github.com/owner/repo/issues/2',
+    updatedAt: START,
+  });
+});
+
+for (const { type, search, expected } of [
+  { type: 'issue', search: 'is:issue is:open archived:false org:owner -repo:owner/ignored', expected: [2] },
+  { type: 'pr', search: 'is:pr is:open archived:false draft:false org:owner -repo:owner/ignored', expected: [1] },
+  { type: 'all', search: 'is:open archived:false org:owner -repo:owner/ignored', expected: [1, 2] },
+]) {
+  test(`load: type ${type} narrows search and filters other entries locally`, async () => {
+    const { client, calls } = fixture([page([pullRequest({ id: 1 }), issue({ id: 2 })])]);
+    const result = await client.load(`repos=owner/*&exclude=owner/ignored&type=${type}`);
+    assert.equal(result.complete, true);
+    assert.equal(calls[0].url.searchParams.get('q'), search);
+    assert.deepEqual(result.entries.map(entry => entry.id), expected);
+  });
+}
+
+test('load: reject invalid type before requests', async () => {
+  const { client, calls } = fixture([]);
+  await assert.rejects(client.load('repos=owner/repo&type=discussion'), /Invalid type/);
+  assert.equal(calls.length, 0);
+});
+
+for (const overrides of [
+  { number: 0 },
+  { title: null },
+  { state: 'unknown' },
+  { user: { login: ' ' } },
+  { repository: { archived: 1 } },
+  { repository_url: 'https://evil.example/repos/owner/repo' },
+  { html_url: 'javascript:alert(1)' },
+  { html_url: 'https://github.com/owner/repo/pull/1' },
+  { html_url: 'https://github.com/owner/repo/issues/2' },
+  { html_url: 'https://github.com.evil.example/owner/repo/issues/1' },
+]) {
+  test(`load: reject malformed issue ${JSON.stringify(overrides)}`, async () => {
+    const { client } = fixture([page([issue(overrides)])]);
+    const result = await client.load('repos=owner/*');
+    assert.equal(result.problems[0].code, 'invalid-response');
+    assert.deepEqual(result.entries, []);
+  });
+}
+
+test('load: issue type cannot hide malformed pull request', async () => {
+  const { client } = fixture([page([issue(), pullRequest({ id: 2, draft: 'false' })])]);
+  const result = await client.load('repos=owner/*&type=issue');
+  assert.equal(result.problems[0].code, 'invalid-response');
+  assert.deepEqual(result.entries, []);
 });
 
 test('load: preserve title text without returning unused API fields', async () => {
   const title = '<img src=x onerror=alert(1)> Add feature';
   const { client } = fixture([page([pullRequest({ title, body: '<script>bad()</script>', repositoryName: 'OWNER/Repo' })])]);
   const result = await client.load('repos=owner/*');
-  assert.equal(result.pullRequests[0].title, title);
-  assert.equal(result.pullRequests[0].repository, 'owner/repo');
-  assert.equal(result.pullRequests[0].body, undefined);
-  assert.equal(result.pullRequests[0].url, 'https://github.com/owner/repo/pull/1');
+  assert.equal(result.entries[0].title, title);
+  assert.equal(result.entries[0].repository, 'owner/repo');
+  assert.equal(result.entries[0].body, undefined);
+  assert.equal(result.entries[0].url, 'https://github.com/owner/repo/pull/1');
 });
 
 test('load: deduplicate by ID and prefer newest observed version', async () => {
@@ -224,8 +309,8 @@ test('load: deduplicate by ID and prefer newest observed version', async () => {
   const older = pullRequest({ title: 'Old title', updated_at: '2025-12-01T00:00:00Z' });
   const { client } = fixture([fullPage([newer]), page([older], { total: RESULTS_PER_PAGE + 1 })]);
   const result = await client.load('repos=owner/*');
-  assert.equal(result.pullRequests.length, 1);
-  assert.equal(result.pullRequests[0].title, 'New title');
+  assert.equal(result.entries.length, 1);
+  assert.equal(result.entries[0].title, 'New title');
 });
 
 for (const overrides of [
@@ -242,7 +327,7 @@ for (const overrides of [
     ]);
     const result = await client.load('repos=owner/*&exclude=owner/excluded');
     assert.equal(result.complete, true);
-    assert.deepEqual(result.pullRequests, []);
+    assert.deepEqual(result.entries, []);
   });
 }
 
@@ -251,7 +336,7 @@ test('load: older ineligible observation cannot remove newer result', async () =
     fullPage([pullRequest()]),
     page([pullRequest({ draft: true, updated_at: '2025-12-01T00:00:00Z' })], { total: RESULTS_PER_PAGE + 1 }),
   ]);
-  assert.equal((await client.load('repos=owner/*')).pullRequests.length, 1);
+  assert.equal((await client.load('repos=owner/*')).entries.length, 1);
 });
 
 test('load: report incomplete results only once per scope', async () => {
@@ -261,7 +346,7 @@ test('load: report incomplete results only once per scope', async () => {
   ]);
   const result = await client.load('repos=owner/*');
   assert.equal(result.complete, false);
-  assert.equal(result.pullRequests.length, 2);
+  assert.equal(result.entries.length, 2);
   assert.deepEqual(result.problems.map(problem => problem.code), ['incomplete']);
 });
 
@@ -269,7 +354,7 @@ test('load: short nonempty page is incomplete even when API claims otherwise', a
   const { client } = fixture([page([pullRequest()], { total: 2 })]);
   const result = await client.load('repos=owner/*');
   assert.equal(result.complete, false);
-  assert.equal(result.pullRequests.length, 1);
+  assert.equal(result.entries.length, 1);
   assert.equal(result.problems[0].code, 'incomplete');
 });
 
@@ -289,7 +374,7 @@ for (const total of [MAX_SEARCH_RESULTS, MAX_SEARCH_RESULTS + 1]) {
     ));
     const { client, calls } = fixture(responses);
     const result = await client.load('repos=owner/*');
-    assert.equal(result.pullRequests.length, MAX_SEARCH_RESULTS);
+    assert.equal(result.entries.length, MAX_SEARCH_RESULTS);
     assert.equal(calls.length, MAX_SEARCH_RESULTS / RESULTS_PER_PAGE);
     assert.equal(result.complete, total === MAX_SEARCH_RESULTS);
     assert.deepEqual(result.problems.map(problem => problem.code), total > MAX_SEARCH_RESULTS ? ['capped'] : []);
@@ -313,7 +398,7 @@ for (const data of [
     const result = await client.load('repos=owner/*');
     assert.equal(result.complete, false);
     assert.equal(result.problems[0].code, 'invalid-response');
-    assert.deepEqual(result.pullRequests, []);
+    assert.deepEqual(result.entries, []);
   });
 }
 
@@ -352,7 +437,7 @@ for (const overrides of [
     const { client } = fixture([page([pullRequest(overrides)])]);
     const result = await client.load('repos=owner/*');
     assert.equal(result.problems[0].code, 'invalid-response');
-    assert.deepEqual(result.pullRequests, []);
+    assert.deepEqual(result.entries, []);
   });
 }
 
@@ -372,7 +457,7 @@ test('load: bound retained titles and authors independently of response size', a
 test('load: malformed page entries cannot partially mutate results', async () => {
   const { client } = fixture([page([pullRequest(), null])]);
   const result = await client.load('repos=owner/*');
-  assert.deepEqual(result.pullRequests, []);
+  assert.deepEqual(result.entries, []);
   assert.equal(result.pagesLoaded, 0);
   assert.equal(result.problems[0].code, 'invalid-response');
 });
@@ -411,7 +496,7 @@ test('load: decode UTF-8 across response chunks', async () => {
   });
   const { client } = fixture([new Response(stream)]);
   const result = await client.load('repos=owner/*');
-  assert.equal(result.pullRequests[0].title, 'Add café support');
+  assert.equal(result.entries[0].title, 'Add café support');
 });
 
 for (const { status, code, body } of [
@@ -431,7 +516,7 @@ for (const { status, code, body } of [
     assert.equal(result.complete, false);
     assert.equal(calls.length, 3);
     assert.equal(result.pagesLoaded, 2);
-    assert.deepEqual(result.pullRequests.map(pr => pr.id), [1, 3]);
+    assert.deepEqual(result.entries.map(entry => entry.id), [1, 3]);
     assert.equal(result.problems[0].code, code);
     assert.equal(result.problems[0].status, status);
     assert.equal(result.problems[0].scope, 'org:second');
@@ -447,7 +532,7 @@ test('load: network failure retains earlier pages without retrying failed page',
   assert.equal(result.complete, false);
   assert.equal(result.problems[0].code, 'network');
   assert.equal(result.problems[0].page, 2);
-  assert.equal(result.pullRequests.length, 1);
+  assert.equal(result.entries.length, 1);
   assert.equal(calls.length, 2);
 });
 
@@ -481,7 +566,7 @@ test('load: successful exhausted response blocks subsequent pages and manual rel
   ]);
   const first = await client.load('repos=owner/*');
   assert.equal(first.complete, false);
-  assert.equal(first.pullRequests.length, 1);
+  assert.equal(first.entries.length, 1);
   assert.equal(first.retryAt, reset);
   assert.equal(first.problems[0].page, 2);
   const blocked = await client.load('repos=owner/*');
@@ -546,7 +631,7 @@ test('load: new load aborts obsolete load and ignores its late response and rate
   assert.equal(calls[0].init.signal.aborted, true);
   late.resolve(page([pullRequest()], { headers: { 'x-ratelimit-remaining': '0' } }));
   await rejected;
-  assert.deepEqual(current.pullRequests.map(pr => pr.id), [2]);
+  assert.deepEqual(current.entries.map(entry => entry.id), [2]);
   assert.deepEqual(oldProgress, ['loading']);
   assert.equal((await client.load('repos=owner/*')).complete, true);
 });
@@ -583,7 +668,7 @@ test('load: request timeout is explicit and other scopes still load', async () =
   const result = await loading;
   assert.equal(result.complete, false);
   assert.equal(result.problems[0].code, 'timeout');
-  assert.equal(result.pullRequests.length, 1);
+  assert.equal(result.entries.length, 1);
   assert.equal(calls.length, 2);
 });
 
