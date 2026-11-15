@@ -8,15 +8,7 @@
   <script type="module" src="main.mjs"></script>
 </head>
 <body>
-  <main id="view" aria-labelledby="view-title">
-    <header>
-      <h1 id="view-title">GitHub issue and PR view</h1>
-      <p>
-        Open issues and pull requests across public GitHub organizations and repositories.
-        Archived repositories, draft PRs, and work-in-progress PR titles are always excluded.
-      </p>
-    </header>
-
+  <main id="view" aria-label="GitHub issue and PR view">
     <form id="filters" class="filters" method="get" action=".">
       <div class="field">
         <label for="filter-repos">Repositories</label>
@@ -48,13 +40,13 @@
       <div class="actions">
         <button id="apply" type="submit" aria-describedby="cooldown">Apply filters</button>
         <button id="refresh" type="button" aria-describedby="cooldown" hidden>Refresh</button>
-        <a href="?repos=platform-mesh/*,kcp-dev/*,kubernetes-sigs/multicluster-runtime&amp;exclude=platform-mesh/portal">Open example</a>
+        <button id="help-open" type="button" aria-haspopup="dialog">Help</button>
       </div>
     </form>
 
     <noscript><p>JavaScript is required to fetch issues and pull requests from GitHub.</p></noscript>
     <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">
-      Enter repositories or open the example.
+      Enter repositories.
     </p>
     <p id="cooldown" role="status" hidden></p>
     <ul id="problems" aria-label="Query problems" hidden></ul>
@@ -76,18 +68,44 @@
       </table>
     </div>
 
-    <details class="notes">
-      <summary>Filters and GitHub limits</summary>
+    <dialog id="help" aria-labelledby="help-title">
+      <h2 id="help-title">GitHub issue and PR view</h2>
       <p>
-        Pull requests titled <code>WIP</code>, <code>work in progress</code>, <code>draft</code>,
-        <code>DNM</code>, or <code>do not merge</code> are excluded.
-        Markers match case-insensitively in brackets or parentheses, or at the start of a title.
-        Issues are not filtered by title.
+        Lists open issues and pull requests across public GitHub organizations and repositories.
+        Select a column header to sort the loaded rows.
       </p>
-      <p>The <code>repos</code> and <code>exclude</code> URL parameters may repeat.</p>
-      <p>Requests are unauthenticated, paced, and never polled automatically.</p>
-      <ul id="limitations"></ul>
-    </details>
+      <h3>Filters</h3>
+      <ul>
+        <li>
+          Repositories: comma-separated <code>organization/*</code> or <code>owner/repository</code> selectors.
+        </li>
+        <li>Exclude repositories: comma-separated <code>owner/repository</code> selectors. Exclusions always win.</li>
+        <li>Type: issues, pull requests, or both.</li>
+        <li>
+          Filters are stored in the <code>repos</code>, <code>exclude</code>, and <code>type</code> URL parameters;
+          <code>repos</code> and <code>exclude</code> may repeat.
+        </li>
+      </ul>
+      <h3>Always excluded</h3>
+      <ul>
+        <li>Archived repositories.</li>
+        <li>Closed issues; closed, merged, and draft pull requests.</li>
+        <li>
+          Pull requests titled <code>WIP</code>, <code>work in progress</code>, <code>draft</code>,
+          <code>DNM</code>, or <code>do not merge</code>.
+          Markers match case-insensitively in brackets or parentheses, or at the start of a title.
+          Issues are not filtered by title.
+        </li>
+      </ul>
+      <h3>Limits</h3>
+      <ul id="limitations">
+        <li>Requests are unauthenticated, paced, and never polled automatically.</li>
+        <li>Counts reflect filters, not GitHub's unfiltered total.</li>
+      </ul>
+      <form method="dialog" class="actions">
+        <button type="submit">Close</button>
+      </form>
+    </dialog>
   </main>
 </body>
 </html>

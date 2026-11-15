@@ -57,7 +57,8 @@ code {
   background-color: var(--code-bg);
 }
 
-h1 {
+h2,
+h3 {
   color: var(--orange);
 }
 
@@ -256,10 +257,15 @@ h1 {
   text-align: right;
 }
 
-.notes {
-  margin-top: 1.5rem;
+dialog {
+  box-sizing: border-box;
+  width: 45rem;
+  max-width: calc(100% - 2rem);
+  border: 1px solid var(--fg-muted);
+  background: var(--bg);
+  color: var(--fg);
 }
 
-.notes summary {
-  cursor: pointer;
+dialog::backdrop {
+  background: rgb(0 0 0 / 50%);
 }

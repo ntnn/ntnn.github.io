@@ -20,6 +20,8 @@ function initView(root) {
   const rows = root.querySelector('#rows');
   const sortButtons = root.querySelectorAll('button[data-sort]');
   const limitations = root.querySelector('#limitations');
+  const help = root.querySelector('#help');
+  const helpButton = root.querySelector('#help-open');
   const client = createGitHubClient();
   const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'long' });
   const sort = { key: 'updatedAt', descending: false };
@@ -198,7 +200,7 @@ function initView(root) {
     if (!hasQuery) {
       loading = false;
       results.setAttribute('aria-busy', 'false');
-      setStatus('idle', 'Enter repositories or open the example. No GitHub requests sent.');
+      setStatus('idle', 'Enter repositories. No GitHub requests sent.');
       updateControls();
       return;
     }
@@ -247,6 +249,7 @@ function initView(root) {
       renderRows();
     });
   }
+  helpButton.addEventListener('click', () => help.showModal());
   refreshButton.addEventListener('click', () => {
     if (!loading && (retryAt === null || retryAt <= Date.now())) void load();
   });
