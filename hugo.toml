@@ -14,3 +14,11 @@ theme = 'ntnn'
     name = 'Tools'
     pageRef = '/tools'
     weight = 20
+
+[server]
+
+  [[server.headers]]
+    for = '/tools/**'
+
+    [server.headers.values]
+      Cache-Control = 'no-cache'
