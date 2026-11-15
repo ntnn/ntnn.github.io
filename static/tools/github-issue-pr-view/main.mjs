@@ -1,3 +1,4 @@
+import { MAX_SEARCH_LENGTH, filterEntries, filterOptions } from './filter.mjs';
 import { createGitHubClient, SEARCH_LIMITATIONS } from './github.mjs';
 import { MAX_QUERY_LENGTH, TYPES, parseQuery } from './query.mjs';
 
@@ -5,6 +6,7 @@ import { MAX_QUERY_LENGTH, TYPES, parseQuery } from './query.mjs';
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 const TYPE_LABELS = Object.freeze({ issue: 'Issue', pr: 'PR' });
+const DELETED_USER_LABEL = 'Deleted user';
 
 function initView(root) {
   const form = root.querySelector('#filters');
@@ -16,6 +18,10 @@ function initView(root) {
   const status = root.querySelector('#status');
   const cooldown = root.querySelector('#cooldown');
   const problems = root.querySelector('#problems');
+  const localFilters = root.querySelector('#local-filters');
+  const dropdowns = root.querySelectorAll('details.dropdown');
+  const textInput = root.querySelector('#filter-text');
+  const filterCount = root.querySelector('#filter-count');
   const results = root.querySelector('#results');
   const rows = root.querySelector('#rows');
   const sortButtons = root.querySelectorAll('button[data-sort]');
@@ -25,6 +31,7 @@ function initView(root) {
   const client = createGitHubClient();
   const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'long' });
   const sort = { key: 'updatedAt', descending: false };
+  const selection = { groups: new Set(), repositories: new Set(), authors: new Set() };
   let entries = [];
   let activeController;
   let loading = false;
@@ -34,6 +41,7 @@ function initView(root) {
 
   reposInput.maxLength = MAX_QUERY_LENGTH;
   excludeInput.maxLength = MAX_QUERY_LENGTH;
+  textInput.maxLength = MAX_SEARCH_LENGTH;
   if (window.location.search.length <= MAX_QUERY_LENGTH) {
     const params = new URLSearchParams(window.location.search);
     reposInput.value = params.getAll('repos').filter(value => value.trim()).join(',');
@@ -79,6 +87,7 @@ function initView(root) {
     entries = [];
     rows.replaceChildren();
     results.hidden = true;
+    localFilters.hidden = true;
     problems.replaceChildren();
     problems.hidden = true;
   }
@@ -122,9 +131,39 @@ function initView(root) {
     return (sort.descending ? -order : order) || left.updatedAt - right.updatedAt || left.id - right.id;
   }
 
+  function renderFilterOptions() {
+    const options = filterOptions(entries);
+    textInput.value = '';
+    for (const dropdown of dropdowns) {
+      const selected = selection[dropdown.dataset.filter];
+      selected.clear();
+      dropdown.open = false;
+      const items = options[dropdown.dataset.filter].map(option => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) selected.add(option.value);
+          else selected.delete(option.value);
+          renderRows();
+        });
+        const count = document.createElement('span');
+        count.className = 'option-count';
+        count.textContent = option.count.toLocaleString();
+        const label = document.createElement('label');
+        label.append(checkbox, option.value ?? DELETED_USER_LABEL, count);
+        const item = document.createElement('li');
+        item.append(label);
+        return item;
+      });
+      dropdown.querySelector('ul').replaceChildren(...items);
+    }
+    localFilters.hidden = entries.length === 0;
+  }
+
   function renderRows() {
+    const visible = filterEntries(entries, { ...selection, text: textInput.value });
     const fragment = document.createDocumentFragment();
-    for (const entry of [...entries].sort(compareEntries)) {
+    for (const entry of visible.sort(compareEntries)) {
       const link = document.createElement('a');
       link.href = entry.url;
       link.title = entry.title;
@@ -135,13 +174,19 @@ function initView(root) {
         cell(entry.repository),
         cell(String(entry.number)),
         cell(link),
-        cell(entry.author ?? 'Deleted user'),
+        cell(entry.author ?? DELETED_USER_LABEL),
         cell(timeElement(entry.updatedAt)),
       );
       fragment.append(row);
     }
     rows.replaceChildren(fragment);
+    filterCount.textContent = `${visible.length.toLocaleString()} of ${countLabel(entries.length)}`;
 
+    for (const dropdown of dropdowns) {
+      const summary = dropdown.querySelector('summary');
+      const selected = selection[dropdown.dataset.filter].size;
+      summary.textContent = selected ? `${summary.dataset.label} (${selected})` : summary.dataset.label;
+    }
     for (const button of sortButtons) {
       const header = button.closest('th');
       if (button.dataset.sort === sort.key) {
@@ -154,6 +199,7 @@ function initView(root) {
 
   function renderResult(result) {
     entries = result.entries;
+    renderFilterOptions();
     renderRows();
     results.hidden = entries.length === 0;
 
@@ -249,6 +295,21 @@ function initView(root) {
       renderRows();
     });
   }
+  textInput.addEventListener('input', renderRows);
+  document.addEventListener('click', event => {
+    for (const dropdown of dropdowns) {
+      if (!dropdown.contains(event.target)) dropdown.open = false;
+    }
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    for (const dropdown of dropdowns) {
+      if (!dropdown.open) continue;
+      const focused = dropdown.contains(document.activeElement);
+      dropdown.open = false;
+      if (focused) dropdown.querySelector('summary').focus();
+    }
+  });
   helpButton.addEventListener('click', () => help.showModal());
   refreshButton.addEventListener('click', () => {
     if (!loading && (retryAt === null || retryAt <= Date.now())) void load();

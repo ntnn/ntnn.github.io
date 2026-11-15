@@ -47,6 +47,24 @@
     <p id="cooldown" role="status" hidden></p>
     <ul id="problems" aria-label="Query problems" hidden></ul>
 
+    <div id="local-filters" class="local-filters" role="group" aria-label="Filter loaded rows" hidden>
+      <details class="dropdown" data-filter="groups">
+        <summary data-label="Group">Group</summary>
+        <ul></ul>
+      </details>
+      <details class="dropdown" data-filter="repositories">
+        <summary data-label="Repository">Repository</summary>
+        <ul></ul>
+      </details>
+      <details class="dropdown" data-filter="authors">
+        <summary data-label="Author">Author</summary>
+        <ul></ul>
+      </details>
+      <input id="filter-text" type="search" spellcheck="false" autocapitalize="none"
+        placeholder="Search subject" aria-label="Search subject">
+      <span id="filter-count" role="status"></span>
+    </div>
+
     <div id="results" class="results" role="region" aria-label="Issue and pull request results" tabindex="0" hidden>
       <table>
         <caption>Local times. Counts reflect filters, not GitHub's unfiltered total. Select a column header to sort.</caption>
@@ -81,6 +99,16 @@
           Filters are stored in the <code>repos</code>, <code>exclude</code>, and <code>type</code> URL parameters;
           <code>repos</code> and <code>exclude</code> may repeat.
         </li>
+      </ul>
+      <h3>Loaded rows</h3>
+      <ul>
+        <li>
+          Group, Repository, and Author narrow the loaded rows; a group is the owner or organization of a repository.
+          A list with nothing checked shows everything.
+        </li>
+        <li>Checked values within one list are alternatives; the lists and the subject search must all match.</li>
+        <li>Subject search matches titles, ignoring case.</li>
+        <li>These filters run in the browser, are not stored in the URL, and reset on every load.</li>
       </ul>
       <h3>Always excluded</h3>
       <ul>
