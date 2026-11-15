@@ -11,6 +11,6 @@ theme = 'ntnn'
     weight = 10
 
   [[menus.main]]
-    name = 'Open PRs'
-    pageRef = '/prs'
+    name = 'Tools'
+    pageRef = '/tools'
     weight = 20

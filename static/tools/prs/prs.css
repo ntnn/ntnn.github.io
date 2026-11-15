@@ -1,5 +1,65 @@
-main {
-  min-width: 0;
+:root {
+  color-scheme: dark;
+  --bg: #323232;
+  --fg: #cccccc;
+  --fg-muted: #8a8a8a;
+  --link: #00aaff;
+  --link-hover: #33bbff;
+  --orange: #ffaf00;
+  --green: #5faf00;
+  --red: #cc0000;
+  --border-color: #444444;
+  --code-bg: #2a2a2a;
+  --selection-bg: #444444;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #e8e8e8;
+    --fg: #323232;
+    --fg-muted: #5a5a5a;
+    --link: #0077cc;
+    --link-hover: #005599;
+    --orange: #cc8800;
+    --green: #3d7a00;
+    --red: #aa0000;
+    --border-color: #b0b0b0;
+    --code-bg: #d8d8d8;
+    --selection-bg: #c0c0c0;
+  }
+}
+
+body {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1rem;
+  color: var(--fg);
+  background-color: var(--bg);
+  font-family: sans-serif;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
+::selection {
+  background: var(--selection-bg);
+}
+
+code {
+  padding: 0.1em 0.3em;
+  background-color: var(--code-bg);
+}
+
+h1 {
+  color: var(--orange);
 }
 
 .prs {

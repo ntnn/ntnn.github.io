@@ -1,5 +1,5 @@
-import { createGitHubClient, SEARCH_LIMITATIONS } from './prs/github.mjs';
-import { MAX_QUERY_LENGTH, parseQuery } from './prs/query.mjs';
+import { createGitHubClient, SEARCH_LIMITATIONS } from './github.mjs';
+import { MAX_QUERY_LENGTH, parseQuery } from './query.mjs';
 
 // Browsers clamp larger timer delays to a near-immediate callback.
 const MAX_TIMER_DELAY_MS = 2_147_483_647;

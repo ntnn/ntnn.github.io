@@ -10,7 +10,7 @@ import {
   normalizeSelector,
   parseQuery,
   serializeQuery,
-} from '../../themes/ntnn/assets/js/prs/query.mjs';
+} from '../../static/tools/prs/query.mjs';
 
 const EXAMPLE_QUERY = '?repos=platform-mesh/*,kcp-dev/*,kubernetes-sigs/multicluster-runtime&exclude=platform-mesh/portal';
 

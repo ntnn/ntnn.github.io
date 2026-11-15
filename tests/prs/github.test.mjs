@@ -11,7 +11,7 @@ import {
   SEARCH_INTERVAL_MS,
   SEARCH_LIMITATIONS,
   createGitHubClient,
-} from '../../themes/ntnn/assets/js/prs/github.mjs';
+} from '../../static/tools/prs/github.mjs';
 
 const START = Date.parse('2026-01-01T00:00:00Z');
 const MINUTE_MS = 60_000;

@@ -1,38 +1,21 @@
-{{ define "head-extra" }}
-  {{- $opts := dict
-    "minify" (cond hugo.IsDevelopment false true)
-    "sourceMap" (cond hugo.IsDevelopment "linked" "none")
-  }}
-  {{- with resources.Get "css/prs.css" }}
-    {{- with . | css.Build $opts }}
-      {{- if hugo.IsDevelopment }}
-        <link rel="stylesheet" href="{{ .RelPermalink }}">
-      {{- else }}
-        {{- with . | fingerprint }}
-          <link rel="stylesheet" href="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}" crossorigin="anonymous">
-        {{- end }}
-      {{- end }}
-    {{- end }}
-  {{- end }}
-  {{- with resources.Get "js/prs.mjs" }}
-    {{- with . | js.Build (merge $opts (dict "targetPath" "js/prs.js")) }}
-      {{- if hugo.IsDevelopment }}
-        <script defer src="{{ .RelPermalink }}"></script>
-      {{- else }}
-        {{- with . | fingerprint }}
-          <script defer src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}" crossorigin="anonymous"></script>
-        {{- end }}
-      {{- end }}
-    {{- end }}
-  {{- end }}
-{{ end }}
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Open PRs</title>
+  <link rel="stylesheet" href="prs.css">
+  <script type="module" src="prs.mjs"></script>
+</head>
+<body>
+  <main class="prs" id="prs" aria-labelledby="prs-title">
+    <h1 id="prs-title">Open PRs</h1>
+    <p>
+      Browse public GitHub pull requests across organizations and repositories.
+      Archived repositories, draft PRs, and work-in-progress titles are always excluded.
+    </p>
 
-{{ define "main" }}
-  <section class="prs" id="prs" aria-labelledby="prs-title">
-    <h1 id="prs-title">{{ .Title }}</h1>
-    {{ .Content }}
-
-    <form id="prs-form" class="prs-form" method="get" action="{{ .RelPermalink }}">
+    <form id="prs-form" class="prs-form" method="get" action=".">
       <label for="prs-repos">Repositories</label>
       <input id="prs-repos" name="repos" type="text" spellcheck="false" autocapitalize="none"
         placeholder="platform-mesh/*,kcp-dev/*,owner/repository" aria-describedby="prs-repos-help">
@@ -51,7 +34,7 @@
       <div class="prs-actions">
         <button id="prs-apply" type="submit" aria-describedby="prs-cooldown">Apply filters</button>
         <button id="prs-refresh" type="button" aria-describedby="prs-cooldown" hidden>Refresh</button>
-        <a href="{{ .RelPermalink }}?repos=platform-mesh/*,kcp-dev/*,kubernetes-sigs/multicluster-runtime&amp;exclude=platform-mesh/portal">Open example</a>
+        <a href="?repos=platform-mesh/*,kcp-dev/*,kubernetes-sigs/multicluster-runtime&amp;exclude=platform-mesh/portal">Open example</a>
       </div>
     </form>
 
@@ -87,5 +70,6 @@
       <p>Requests are unauthenticated, paced, and never polled automatically.</p>
       <ul id="prs-limitations"></ul>
     </details>
-  </section>
-{{ end }}
+  </main>
+</body>
+</html>
