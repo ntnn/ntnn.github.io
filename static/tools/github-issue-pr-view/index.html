@@ -7,25 +7,19 @@
   <link rel="stylesheet" href="main.css">
   <script type="module" src="main.mjs"></script>
 </head>
-<body>
-  <main id="view" aria-label="GitHub issue and PR view">
+<body id="view">
+  <header>
     <form id="filters" class="filters" method="get" action=".">
       <div class="field">
         <label for="filter-repos">Repositories</label>
         <input id="filter-repos" name="repos" type="text" spellcheck="false" autocapitalize="none"
-          placeholder="platform-mesh/*,kcp-dev/*,owner/repository" aria-describedby="filter-repos-help">
-        <p id="filter-repos-help" class="help">
-          Comma-separated <code>organization/*</code> or <code>owner/repository</code> selectors.
-        </p>
+          placeholder="platform-mesh/*,kcp-dev/*,owner/repository">
       </div>
 
       <div class="field">
         <label for="filter-exclude">Exclude repositories</label>
         <input id="filter-exclude" name="exclude" type="text" spellcheck="false" autocapitalize="none"
-          placeholder="platform-mesh/portal" aria-describedby="filter-exclude-help">
-        <p id="filter-exclude-help" class="help">
-          Comma-separated <code>owner/repository</code> selectors. Exclusions always win.
-        </p>
+          placeholder="platform-mesh/portal">
       </div>
 
       <div class="field field-narrow">
@@ -43,7 +37,9 @@
         <button id="help-open" type="button" aria-haspopup="dialog">Help</button>
       </div>
     </form>
+  </header>
 
+  <main aria-label="GitHub issue and PR view">
     <noscript><p>JavaScript is required to fetch issues and pull requests from GitHub.</p></noscript>
     <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">
       Enter repositories.
