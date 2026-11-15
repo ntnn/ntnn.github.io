@@ -60,10 +60,14 @@ test('filterOptions: no entries yield no options', () => {
   assert.deepEqual(filterOptions([]), { groups: [], repositories: [], authors: [] });
 });
 
-test('filterOptions: pin every renovate login before other authors', () => {
-  const authors = ['bob', 'self-hosted-Renovate', 'alice', 'renovate[bot]', null, 'aaron', 'RENOVATE-bot'];
+test('filterOptions: pin every renovate and dependabot login before other authors', () => {
+  const authors = [
+    'bob', 'self-hosted-Renovate', 'alice', 'renovate[bot]', null, 'aaron', 'RENOVATE-bot', 'dependabot[bot]', 'Dependabot-preview',
+  ];
   const options = filterOptions(authors.map((author, index) => entry({ id: index + 1, author })));
   assert.deepEqual(options.authors.map(option => option.value), [
+    'Dependabot-preview',
+    'dependabot[bot]',
     'RENOVATE-bot',
     'renovate[bot]',
     'self-hosted-Renovate',
@@ -79,11 +83,31 @@ test('filterOptions: sort authors case-insensitively', () => {
   assert.deepEqual(options.authors.map(option => option.value), ['alice', 'bob', 'Carl', 'Dave']);
 });
 
-for (const selection of [undefined, {}, { groups: [], repositories: [], authors: [], text: '' }, { text: '   ' }]) {
-  test(`filterEntries: empty selection ${JSON.stringify(selection)} restricts nothing`, () => {
+for (const selection of [undefined, {}, { text: '' }, { text: '   ' }]) {
+  test(`filterEntries: omitted selection ${JSON.stringify(selection)} restricts nothing`, () => {
     assert.deepEqual(filterEntries(ENTRIES, selection), ENTRIES);
   });
 }
+
+test('filterEntries: selecting every option restricts nothing', () => {
+  const options = filterOptions(ENTRIES);
+  const selection = {
+    groups: options.groups.map(option => option.value),
+    repositories: options.repositories.map(option => option.value),
+    authors: options.authors.map(option => option.value),
+  };
+  assert.deepEqual(filterEntries(ENTRIES, selection), ENTRIES);
+});
+
+for (const selection of [{ groups: [] }, { repositories: [] }, { authors: [] }, { groups: new Set() }]) {
+  test(`filterEntries: empty list in ${JSON.stringify(Object.keys(selection))} matches nothing`, () => {
+    assert.deepEqual(filterEntries(ENTRIES, selection), []);
+  });
+}
+
+test('filterEntries: accept sets as selections', () => {
+  assert.deepEqual(ids(filterEntries(ENTRIES, { authors: new Set(['zoe', null]) })), [1, 4, 5]);
+});
 
 for (const { name, selection, expected } of [
   { name: 'one group', selection: { groups: ['kcp-dev'] }, expected: [1, 3, 4] },

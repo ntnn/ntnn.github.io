@@ -50,15 +50,24 @@
     <div id="local-filters" class="local-filters" role="group" aria-label="Filter loaded rows" hidden>
       <details class="dropdown" data-filter="groups">
         <summary data-label="Group">Group</summary>
-        <ul></ul>
+        <div class="panel">
+          <button type="button" class="toggle-all">Select none</button>
+          <ul></ul>
+        </div>
       </details>
       <details class="dropdown" data-filter="repositories">
         <summary data-label="Repository">Repository</summary>
-        <ul></ul>
+        <div class="panel">
+          <button type="button" class="toggle-all">Select none</button>
+          <ul></ul>
+        </div>
       </details>
       <details class="dropdown" data-filter="authors">
         <summary data-label="Author">Author</summary>
-        <ul></ul>
+        <div class="panel">
+          <button type="button" class="toggle-all">Select none</button>
+          <ul></ul>
+        </div>
       </details>
       <input id="filter-text" type="search" spellcheck="false" autocapitalize="none"
         placeholder="Search subject" aria-label="Search subject">
@@ -104,9 +113,10 @@
       <ul>
         <li>
           Group, Repository, and Author narrow the loaded rows; a group is the owner or organization of a repository.
-          A list with nothing checked shows everything.
+          Every value starts checked; unchecking a value hides its rows.
         </li>
-        <li>Checked values within one list are alternatives; the lists and the subject search must all match.</li>
+        <li><code>Select none</code> and <code>Select all</code> toggle a whole list.</li>
+        <li>A row shows when its group, repository, and author are checked and its title matches the subject search.</li>
         <li>Subject search matches titles, ignoring case.</li>
         <li>These filters run in the browser, are not stored in the URL, and reset on every load.</li>
       </ul>

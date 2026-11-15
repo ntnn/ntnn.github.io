@@ -32,6 +32,7 @@ function initView(root) {
   const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'long' });
   const sort = { key: 'updatedAt', descending: false };
   const selection = { groups: new Set(), repositories: new Set(), authors: new Set() };
+  const available = { groups: [], repositories: [], authors: [] };
   let entries = [];
   let activeController;
   let loading = false;
@@ -135,12 +136,16 @@ function initView(root) {
     const options = filterOptions(entries);
     textInput.value = '';
     for (const dropdown of dropdowns) {
-      const selected = selection[dropdown.dataset.filter];
+      const key = dropdown.dataset.filter;
+      const selected = selection[key];
+      available[key] = options[key].map(option => option.value);
       selected.clear();
+      for (const value of available[key]) selected.add(value);
       dropdown.open = false;
-      const items = options[dropdown.dataset.filter].map(option => {
+      const items = options[key].map(option => {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
+        checkbox.checked = true;
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) selected.add(option.value);
           else selected.delete(option.value);
@@ -183,9 +188,12 @@ function initView(root) {
     filterCount.textContent = `${visible.length.toLocaleString()} of ${countLabel(entries.length)}`;
 
     for (const dropdown of dropdowns) {
+      const key = dropdown.dataset.filter;
       const summary = dropdown.querySelector('summary');
-      const selected = selection[dropdown.dataset.filter].size;
-      summary.textContent = selected ? `${summary.dataset.label} (${selected})` : summary.dataset.label;
+      const selected = selection[key].size;
+      const total = available[key].length;
+      summary.textContent = selected === total ? summary.dataset.label : `${summary.dataset.label} (${selected} of ${total})`;
+      dropdown.querySelector('.toggle-all').textContent = selected === total ? 'Select none' : 'Select all';
     }
     for (const button of sortButtons) {
       const header = button.closest('th');
@@ -296,6 +304,19 @@ function initView(root) {
     });
   }
   textInput.addEventListener('input', renderRows);
+  for (const dropdown of dropdowns) {
+    dropdown.querySelector('.toggle-all').addEventListener('click', () => {
+      const key = dropdown.dataset.filter;
+      const selected = selection[key];
+      const selectAll = selected.size < available[key].length;
+      selected.clear();
+      if (selectAll) {
+        for (const value of available[key]) selected.add(value);
+      }
+      for (const checkbox of dropdown.querySelectorAll('input')) checkbox.checked = selectAll;
+      renderRows();
+    });
+  }
   document.addEventListener('click', event => {
     for (const dropdown of dropdowns) {
       if (!dropdown.contains(event.target)) dropdown.open = false;
